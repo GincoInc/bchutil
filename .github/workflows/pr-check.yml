@@ -1,0 +1,41 @@
+name: pr-check
+
+on:
+  pull_request:
+
+jobs:
+  pr-check:
+    name: pr-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # This repository is a GOPATH-era library without a go.mod,
+      # so we use the latest stable Go release.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: gofmt check
+        run: |
+          files=$(gofmt -l .)
+          if [ -n "$files" ]; then
+            echo "The following files are not gofmt-formatted:"
+            echo "$files"
+            exit 1
+          fi
+
+      # Initialize an ephemeral module so build/test work on this
+      # GOPATH-era repository (go.mod is intentionally not committed).
+      - name: init ephemeral module
+        run: |
+          go mod init github.com/GincoInc/bchutil
+          go mod tidy
+
+      - name: build
+        run: go build ./...
+
+      # -vet=off: pre-existing code has vet findings; vet is not part
+      # of this check to avoid failing on untouched legacy code.
+      - name: test
+        run: go test -vet=off ./...
